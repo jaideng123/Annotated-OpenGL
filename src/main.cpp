@@ -62,9 +62,16 @@ int main()
     // Defined in Normalized Device Coordinates (between -1 and 1)
     // Eventually tranformed into screenspace via glViewport
     float vertices[] = {
-        -0.5f, -0.5f, 0.0f,
-        0.5f, -0.5f, 0.0f,
-        0.0f, 0.5f, 0.0f};
+        0.5f, 0.5f, 0.0f,   // top right
+        0.5f, -0.5f, 0.0f,  // bottom right
+        -0.5f, -0.5f, 0.0f, // bottom left
+        -0.5f, 0.5f, 0.0f   // top left
+    };
+    unsigned int indices[] = {
+        // note that we start from 0!
+        0, 1, 3, // first triangle
+        1, 2, 3  // second triangle
+    };
 
     // Similar to VBO stores:
     // - Calls to glEnableVertexAttribArray or glDisableVertexAttribArray.
@@ -76,6 +83,7 @@ int main()
 
     // 0. copy our vertices array in a buffer for OpenGL to use
     // Generate 1 Buffer binding point and assign ID to VBO
+    // VBO stores large # of vertices in GPU memory
     unsigned int VBO;
     glGenBuffers(1, &VBO);
     // Bind ID to a new buffer object with GL_BUFFER_ARRAY buffer type
@@ -83,6 +91,11 @@ int main()
     // Copy vertex data into buffer
     // GL_STATIC_DRAW: the data will most likely not change at all or very rarely.
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    unsigned int EBO;
+    glGenBuffers(1, &EBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
     // 1. then set the vertex attributes pointers
     // Tells opengl how to interpret vertex data
@@ -102,6 +115,9 @@ int main()
     //(R,G,B,A)
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 
+    // Enable wireframe mode
+    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
     // Render Loop
     while (!glfwWindowShouldClose(window))
     {
@@ -115,7 +131,8 @@ int main()
         // use our shader program when we want to render an object
         glUseProgram(shaderProgram);
         glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0); // Unbind vertex array
 
         // Checks for keyboard, mouse, etc.
         glfwPollEvents();
