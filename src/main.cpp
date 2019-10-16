@@ -70,17 +70,9 @@ int main()
         -0.5f, 0.0f, 0.0f // left
     };
 
-    vector<float> vertices2 = {
-        0.0f, 0.0f, 0.0f,  // top
-        0.5f, -0.5f, 0.0f, // right
-        -0.5f, -0.5f, 0.0f // left
-    };
-
     vector<unsigned int> indices = {0, 1, 2};
 
     int VAO1 = generateVAO(vertices, indices);
-    int VAO2 = generateVAO(vertices2, indices);
-
     // Set size of the rendering window(viewport)
     // (X,Y,Len,Width) from top left corner
     glViewport(0, 0, 800, 600);
@@ -108,8 +100,6 @@ int main()
         // use our shader program when we want to render an object
         glUseProgram(shaderProgram);
         glBindVertexArray(VAO1);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        glBindVertexArray(VAO2);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0); // Unbind vertex array
 
