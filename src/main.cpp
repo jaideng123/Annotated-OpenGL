@@ -1,13 +1,20 @@
 // Created based on https://learnopengl.com/Getting-started
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+
 #include <iostream>
 #include <string>
 #include <fstream>
 #include <streambuf>
 #include <vector>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 #include "shader.h"
+
 using namespace std;
+
 void processInput(GLFWwindow *window);
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 int generateVAO(vector<float> vertices, vector<unsigned int> indices);
@@ -15,6 +22,7 @@ int generateVAO(vector<float> vertices, vector<unsigned int> indices);
 // OpenGL acts as a state machine
 int main()
 {
+    stbi_set_flip_vertically_on_load(true);
     glfwInit();
     // Set to OpenGL 3.3
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -39,15 +47,68 @@ int main()
     }
 
     Shader shader = Shader("./shaders/vertex.glsl", "./shaders/frag.glsl");
+
+    unsigned int texture;
+    // (numTextures, out ID)
+    glGenTextures(1, &texture);
+    // Sets active texture for subsequent commands
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    // set the texture wrapping/filtering options (on the currently bound texture object)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    int width, height, nrChannels;
+    unsigned char *data = stbi_load("./textures/container.jpg", &width, &height, &nrChannels, 0);
+    if (!data)
+    {
+        throw runtime_error("Failed to load texture");
+    }
+    // Load data for texture (textureTarget, mipmapLevel, storageFormat, w, h, 0, imageFormat, imageDataType, dataPtr)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D); // Auto-Generate MipMaps (can be set manually instead)
+
+    stbi_image_free(data);
+
+    unsigned int texture2;
+    // (numTextures, out ID)
+    glGenTextures(1, &texture2);
+    // Sets active texture for subsequent commands
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, texture2);
+    // set the texture wrapping/filtering options (on the currently bound texture object)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    data = stbi_load("./textures/awesomeface.png", &width, &height, &nrChannels, 0);
+    if (!data)
+    {
+        throw runtime_error("Failed to load texture");
+    }
+    // Load data for texture (textureTarget, mipmapLevel, storageFormat, w, h, 0, imageFormat, imageDataType, dataPtr)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D); // Auto-Generate MipMaps (can be set manually instead)
+
+    stbi_image_free(data);
+
     // Defined in Normalized Device Coordinates (between -1 and 1)
     // Eventually tranformed into screenspace via glViewport
     vector<float> vertices = {
-        // positions // colors
-        0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f,  // bottom right
-        -0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom left
-        0.0f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f    // top
+        // positions          // colors           // texture coords
+        0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f,   // top right
+        0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,  // bottom right
+        -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, // bottom left
+        -0.5f, 0.5f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f   // top left
     };
-    vector<unsigned int> indices = {0, 1, 2};
+    vector<unsigned int> indices = {
+        0, 1, 3,
+        1, 2, 3};
 
     int VAO1 = generateVAO(vertices, indices);
     // Set size of the rendering window(viewport)
@@ -64,6 +125,11 @@ int main()
     // Enable wireframe mode
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
+    // use our shader program when we want to render an object
+    shader.use();
+    shader.setInt("texture1", 0);
+    shader.setInt("texture2", 1);
+
     // Render Loop
     while (!glfwWindowShouldClose(window))
     {
@@ -74,8 +140,9 @@ int main()
         // GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT and GL_STENCIL_BUFFER_BIT
         glClear(GL_COLOR_BUFFER_BIT);
 
-        // use our shader program when we want to render an object
-        shader.use();
+        // Selects Texture unit for subsequent bindTexture call
+        // glActiveTexture(GL_TEXTURE0); // Optional for location 0
+        // glBindTexture(GL_TEXTURE_2D, texture);
         glBindVertexArray(VAO1);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0); // Unbind vertex array
@@ -121,10 +188,12 @@ int generateVAO(vector<float> vertices, vector<unsigned int> indices)
     // 1. then set the vertex attributes pointers
     // Tells opengl how to interpret vertex data
     // (location(in shader), size of vertex, datatype, normalized, stride(length of vertex data), offset)
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)0);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(float)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
 
     return VAO;
 }

@@ -2,16 +2,14 @@
 // Incoming from vertex shader
 // ALL INPUTS are interpolated from vertex shader
 in vec3 vertexColor;
+in vec2 TexCoord;
 
-// Uniforms are global for each shader program
-// Will keep values till reset/updated
-// set with glUniform<Type>(loc,...data)
-// Useful for exchanging data between render iterations (time, color, etc.)
-// uniform vec4 ourColor
+uniform sampler2D texture1;
+uniform sampler2D texture2;
 
 out vec4 FragColor;
 
 void main()
 {
-    FragColor = vec4(vertexColor, 1.0);
+    FragColor = mix(texture(texture1, TexCoord), texture(texture2, TexCoord), 0.2);
 } 
