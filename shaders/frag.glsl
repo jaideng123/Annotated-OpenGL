@@ -1,10 +1,17 @@
 #version 330 core
 // Incoming from vertex shader
-in vec4 vertexColor;
+// ALL INPUTS are interpolated from vertex shader
+in vec3 vertexColor;
+
+// Uniforms are global for each shader program
+// Will keep values till reset/updated
+// set with glUniform<Type>(loc,...data)
+// Useful for exchanging data between render iterations (time, color, etc.)
+// uniform vec4 ourColor
 
 out vec4 FragColor;
 
 void main()
 {
-    FragColor = vertexColor;
+    FragColor = vec4(vertexColor, 1.0);
 } 

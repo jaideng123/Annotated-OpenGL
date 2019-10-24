@@ -6,13 +6,10 @@
 #include <fstream>
 #include <streambuf>
 #include <vector>
+#include "shader.h"
 using namespace std;
 void processInput(GLFWwindow *window);
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
-string readFileContents(string filename);
-void checkSuccessfulShaderCompilation(int shaderId);
-int generateAndCompileShader(string sourceFileLocation, int shaderType);
-void checkSuccessfulShaderLink(int shaderId);
 int generateVAO(vector<float> vertices, vector<unsigned int> indices);
 
 // OpenGL acts as a state machine
@@ -41,35 +38,15 @@ int main()
         return -1;
     }
 
-    int vertexShader = generateAndCompileShader("./shaders/vertex.glsl", GL_VERTEX_SHADER);
-
-    checkSuccessfulShaderCompilation(vertexShader);
-
-    int fragmentShader = generateAndCompileShader("./shaders/frag.glsl", GL_FRAGMENT_SHADER);
-
-    checkSuccessfulShaderCompilation(fragmentShader);
-
-    unsigned int shaderProgram;
-    shaderProgram = glCreateProgram();
-
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-
-    checkSuccessfulShaderLink(shaderProgram);
-
-    // Need to clean up shader object no that we no longer use them
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-
+    Shader shader = Shader("./shaders/vertex.glsl", "./shaders/frag.glsl");
     // Defined in Normalized Device Coordinates (between -1 and 1)
     // Eventually tranformed into screenspace via glViewport
     vector<float> vertices = {
-        0.0f, 0.5f, 0.0f, // top
-        0.5f, 0.0f, 0.0f, // right
-        -0.5f, 0.0f, 0.0f // left
+        // positions // colors
+        0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f,  // bottom right
+        -0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom left
+        0.0f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f    // top
     };
-
     vector<unsigned int> indices = {0, 1, 2};
 
     int VAO1 = generateVAO(vertices, indices);
@@ -98,7 +75,7 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
 
         // use our shader program when we want to render an object
-        glUseProgram(shaderProgram);
+        shader.use();
         glBindVertexArray(VAO1);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0); // Unbind vertex array
@@ -144,66 +121,12 @@ int generateVAO(vector<float> vertices, vector<unsigned int> indices)
     // 1. then set the vertex attributes pointers
     // Tells opengl how to interpret vertex data
     // (location(in shader), size of vertex, datatype, normalized, stride(length of vertex data), offset)
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
-    // Enable array in shader at location 0
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
     glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
 
     return VAO;
-}
-
-string readFileContents(string filename)
-{
-    std::ifstream filestream(filename);
-    std::string output((std::istreambuf_iterator<char>(filestream)),
-                       std::istreambuf_iterator<char>());
-    return output;
-}
-
-int generateAndCompileShader(string sourceFileLocation, int shaderType)
-{
-    unsigned int shaderId;
-    // Create Shader Object
-    shaderId = glCreateShader(shaderType);
-
-    // Read source code into a C string
-    const char *vertexShaderSource = readFileContents(sourceFileLocation).c_str();
-    // Read source code into shader object
-    glShaderSource(shaderId, 1, &vertexShaderSource, NULL);
-
-    // Compile shader
-    glCompileShader(shaderId);
-
-    return shaderId;
-}
-
-void checkSuccessfulShaderCompilation(int shaderId)
-{
-    // Check if shader compilation was successful
-    int success;
-    char infoLog[512];
-    glGetShaderiv(shaderId, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
-        glGetShaderInfoLog(shaderId, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n"
-                  << infoLog << std::endl;
-        throw runtime_error("Shader Compilation Unsuccessful");
-    }
-}
-
-void checkSuccessfulShaderLink(int shaderProgramId)
-{
-    // Check if shader compilation was successful
-    int success;
-    char infoLog[512];
-    glGetProgramiv(shaderProgramId, GL_LINK_STATUS, &success);
-    if (!success)
-    {
-        glGetProgramInfoLog(shaderProgramId, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::PROGRAM::LINK_FAILED\n"
-                  << infoLog << std::endl;
-        throw runtime_error("Shader Linking Unsuccessful");
-    }
 }
 
 void processInput(GLFWwindow *window)
