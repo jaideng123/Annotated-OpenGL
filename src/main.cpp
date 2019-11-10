@@ -23,6 +23,15 @@ void processInput(GLFWwindow *window);
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 int generateVAO(vector<float> vertices, vector<unsigned int> indices);
 
+// camera coordinates (in worlds space)
+glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 0.0f);
+// target coordinates (in worlds space)
+glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+// up direction (in worlds space)
+glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+float deltaTime = 0.0f; // Time between current frame and last frame
+float lastFrame = 0.0f; // Time of last frame
+
 // OpenGL acts as a state machine
 int main()
 {
@@ -174,6 +183,9 @@ int main()
     // Render Loop
     while (!glfwWindowShouldClose(window))
     {
+        float currentFrame = glfwGetTime();
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
         processInput(window);
 
         // Clears Color buffer
@@ -181,14 +193,13 @@ int main()
         // GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT and GL_STENCIL_BUFFER_BIT
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        // Creates a view matrix w/ (pos,target,up) that is looking from pos to target
+        glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+
         glm::mat4 projection;
         // perspective(FOV, aspectRatio, nearPlaneDist, farPlaneDist)
         projection = glm::perspective<double>(glm::radians(45.0f), 800.0 / 600.0, 0.1f, 100.0f);
 
-        // View Matrix represents Camera postion + rotation
-        glm::mat4 view = glm::mat4(1.0f);
-        // note that we're translating the scene in the reverse direction of where we want to move
-        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
         // Selects Texture unit for subsequent bindTexture call
         glBindVertexArray(VAO1);
         for (unsigned int i = 0; i < 10; i++)
@@ -259,8 +270,17 @@ int generateVAO(vector<float> vertices, vector<unsigned int> indices)
 
 void processInput(GLFWwindow *window)
 {
+    float cameraSpeed = 2.5f * deltaTime;
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        cameraPos += cameraSpeed * cameraFront;
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        cameraPos -= cameraSpeed * cameraFront;
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
 }
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height)
