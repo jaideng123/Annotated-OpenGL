@@ -20,6 +20,7 @@
 using namespace std;
 
 void processInput(GLFWwindow *window);
+void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 int generateVAO(vector<float> vertices, vector<unsigned int> indices);
 
@@ -29,6 +30,9 @@ glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 0.0f);
 glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
 // up direction (in worlds space)
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+float yaw = 0;
+float pitch = 0;
+
 float deltaTime = 0.0f; // Time between current frame and last frame
 float lastFrame = 0.0f; // Time of last frame
 
@@ -51,6 +55,11 @@ int main()
     }
 
     glfwMakeContextCurrent(window);
+
+    // hide + capture cursor
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    // get cursor input
+    glfwSetCursorPosCallback(window, mouse_callback);
 
     // Load GLAD (GL calls will only work after this)
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -281,6 +290,28 @@ void processInput(GLFWwindow *window)
         cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+}
+
+float lastX = 400, lastY = 300;
+void mouse_callback(GLFWwindow *window, double xpos, double ypos)
+{
+    float xoffset = xpos - lastX;
+    float yoffset = lastY - ypos; // reversed since y-coordinates range from bottom to top
+    lastX = xpos;
+    lastY = ypos;
+
+    float sensitivity = 0.05f;
+    xoffset *= sensitivity;
+    yoffset *= sensitivity;
+    yaw += xoffset;
+    pitch += yoffset;
+    pitch = glm::clamp(pitch, -89.0f, 89.0f);
+
+    glm::vec3 front;
+    front.x = cos(glm::radians(pitch)) * cos(glm::radians(yaw));
+    front.y = sin(glm::radians(pitch));
+    front.z = cos(glm::radians(pitch)) * sin(glm::radians(yaw));
+    cameraFront = glm::normalize(front);
 }
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height)
