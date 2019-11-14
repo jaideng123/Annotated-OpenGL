@@ -1,9 +1,9 @@
 #include "shader.h"
 #include <glad/glad.h>
-#include <iostream>
 #include <string>
 #include <fstream>
-#include <streambuf>
+#include <sstream>
+#include <iostream>
 
 using namespace std;
 
@@ -57,7 +57,8 @@ int Shader::generateAndCompileShader(string sourceFileLocation, int shaderType)
     shaderId = glCreateShader(shaderType);
 
     // Read source code into a C string
-    const char *vertexShaderSource = readFileContents(sourceFileLocation).c_str();
+    string shaderSource = readFileContents(sourceFileLocation);
+    const char *vertexShaderSource = shaderSource.c_str();
     // Read source code into shader object
     glShaderSource(shaderId, 1, &vertexShaderSource, NULL);
 
@@ -69,10 +70,13 @@ int Shader::generateAndCompileShader(string sourceFileLocation, int shaderType)
 
 string Shader::readFileContents(string filename)
 {
-    ifstream filestream(filename);
-    string output((istreambuf_iterator<char>(filestream)),
-                  istreambuf_iterator<char>());
-    return output;
+    ifstream file;
+    file.open(filename);
+    stringstream fileStream;
+    fileStream << file.rdbuf();
+    file.close();
+
+    return fileStream.str();
 }
 
 void Shader::checkSuccessfulShaderCompilation(int shaderId)

@@ -2,10 +2,7 @@
 #define SHADER_H
 
 #include <glad/glad.h>
-#include <iostream>
 #include <string>
-#include <fstream>
-#include <streambuf>
 
 using namespace std;
 
