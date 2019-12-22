@@ -23,7 +23,8 @@ using namespace std;
 void processInput(GLFWwindow *window);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
-int generateVAO(vector<float> vertices, vector<unsigned int> indices);
+int generateModelVAO(vector<float> vertices, vector<unsigned int> indices);
+int generateLightVAO(vector<float> vertices, vector<unsigned int> indices);
 
 Camera camera = Camera();
 
@@ -61,8 +62,9 @@ int main()
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
+    Shader lampShader = Shader("./shaders/vertex.glsl", "./shaders/fragLamp.glsl");
 
-    Shader shader = Shader("./shaders/vertex.glsl", "./shaders/frag.glsl");
+    Shader lightingShader = Shader("./shaders/vertex.glsl", "./shaders/fragLighting.glsl");
 
     unsigned int texture;
     // (numTextures, out ID)
@@ -144,11 +146,10 @@ int main()
         2, 3, 7,
 
         2, 6, 1, // Bottom
-        1, 5, 6
+        1, 5, 6};
 
-    };
-
-    int VAO1 = generateVAO(vertices, indices);
+    int VAO1 = generateModelVAO(vertices, indices);
+    int lightVAO = generateLightVAO(vertices, indices);
     // Set size of the rendering window(viewport)
     // (X,Y,Len,Width) from top left corner
     glViewport(0, 0, 800, 600);
@@ -162,11 +163,6 @@ int main()
 
     // Enable wireframe mode
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-    // use our shader program when we want to render an object
-    shader.use();
-    shader.setInt("texture1", 0);
-    shader.setInt("texture2", 1);
 
     // Enable Z-buffer test
     glEnable(GL_DEPTH_TEST);
@@ -190,18 +186,34 @@ int main()
         glm::mat4 projection;
         // perspective(FOV, aspectRatio, nearPlaneDist, farPlaneDist)
         projection = glm::perspective<double>(glm::radians(45.0f), 800.0 / 600.0, 0.1f, 100.0f);
-
+        // use our shader program when we want to render an object
+        lightingShader.use();
+        lightingShader.setInt("texture1", 0);
+        lightingShader.setInt("texture2", 1);
         // Selects Texture unit for subsequent bindTexture call
         glBindVertexArray(VAO1);
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(0, 0, -3.0f));
         model = glm::rotate(model, (float)glfwGetTime() * glm::radians(50.0f), glm::vec3(0.5f, 1.0f, 0.0f));
 
-        shader.setMat4("projection", projection);
-        shader.setMat4("view", view);
-        shader.setMat4("model", model);
-
+        lightingShader.setMat4("projection", projection);
+        lightingShader.setMat4("view", view);
+        lightingShader.setMat4("model", model);
+        lightingShader.setVec3("lightColor", glm::vec3(.5f, 1.0f, 1.0f));
+        // glDrawElements uses an index array + allows access to Post-Transform cache, glDrawArrays does not
         glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0, 1.0f, -3.0f));
+        model = glm::scale(model, glm::vec3(0.2f));
+
+        lampShader.use();
+        lampShader.setMat4("projection", projection);
+        lampShader.setMat4("view", view);
+        lampShader.setMat4("model", model);
+        glBindVertexArray(lightVAO);
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+
         glBindVertexArray(0); // Unbind vertex array
 
         // Checks for keyboard, mouse, etc.
@@ -216,7 +228,7 @@ int main()
     return 0;
 }
 
-int generateVAO(vector<float> vertices, vector<unsigned int> indices)
+int generateModelVAO(vector<float> vertices, vector<unsigned int> indices)
 {
     // Similar to VBO stores:
     // - Calls to glEnableVertexAttribArray or glDisableVertexAttribArray.
@@ -251,6 +263,29 @@ int generateVAO(vector<float> vertices, vector<unsigned int> indices)
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(6 * sizeof(float)));
     glEnableVertexAttribArray(2);
+
+    return VAO;
+}
+
+// Same as above but w/o color + texture information
+int generateLightVAO(vector<float> vertices, vector<unsigned int> indices)
+{
+    unsigned int VAO;
+    glGenVertexArrays(1, &VAO);
+    glBindVertexArray(VAO);
+
+    unsigned int VBO;
+    glGenBuffers(1, &VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0], GL_STATIC_DRAW);
+
+    unsigned int EBO;
+    glGenBuffers(1, &EBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(0);
 
     return VAO;
 }

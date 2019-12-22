@@ -58,6 +58,11 @@ void Shader::setMat4(const string &name, glm::mat4 value) const
     glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, glm::value_ptr(value));
 }
 
+void Shader::setVec3(const string &name, glm::vec3 value) const
+{
+    glUniform3f(glGetUniformLocation(ID, name.c_str()), value.x, value.y, value.z);
+}
+
 int Shader::generateAndCompileShader(string sourceFileLocation, int shaderType)
 {
     unsigned int shaderId;
