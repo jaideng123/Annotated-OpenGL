@@ -226,9 +226,15 @@ int main()
 
         // Use lamp shader to render lamp
         lampShader.use();
+        glm::vec3 lightColor;
+        lightColor.x = sin(glfwGetTime() * 2.0f);
+        lightColor.y = sin(glfwGetTime() * 0.7f);
+        lightColor.z = sin(glfwGetTime() * 1.3f);
+
         lampShader.setMat4("projection", projection);
         lampShader.setMat4("view", view);
         lampShader.setMat4("model", lampModel);
+        lampShader.setVec3("color", lightColor);
         glBindVertexArray(lightVAO);
         glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 
@@ -236,7 +242,6 @@ int main()
         lightingShader.use();
         lightingShader.setInt("texture1", 0);
         lightingShader.setInt("texture2", 1);
-        lightingShader.setVec3("lightPos", lightPos);
         lightingShader.setVec3("viewPos", camera.Position);
         // Selects Texture unit for subsequent bindTexture call
         glBindVertexArray(VAO1);
@@ -247,7 +252,24 @@ int main()
         lightingShader.setMat4("projection", projection);
         lightingShader.setMat4("view", view);
         lightingShader.setMat4("model", cubeModel);
-        lightingShader.setVec3("lightColor", glm::vec3(.5f, 1.0f, 1.0f));
+
+        // We can set a struct member using <struct>.member
+        // set Material Properties
+        lightingShader.setVec3("material.ambient", glm::vec3(0.5f, 0.5f, 0.5f));
+        lightingShader.setVec3("material.diffuse", glm::vec3(1.0f, 1.0f, 1.0f));
+        lightingShader.setVec3("material.specular", glm::vec3(1.0f, 1.0f, 1.0f));
+        lightingShader.setFloat("material.shininess", 32.0f);
+
+        // Set Light Properties
+        lightingShader.setVec3("light.position", lightPos);
+
+        glm::vec3 diffuseColor = lightColor * glm::vec3(0.5f);
+        glm::vec3 ambientColor = diffuseColor * glm::vec3(0.2f);
+
+        lightingShader.setVec3("light.ambient", ambientColor);
+        lightingShader.setVec3("light.diffuse", diffuseColor);
+        lightingShader.setVec3("light.specular", glm::vec3(1.0f, 1.0f, 1.0f));
+
         // glDrawElements uses an index array + allows access to Post-Transform cache, glDrawArrays does not
         glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 
