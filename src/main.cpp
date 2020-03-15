@@ -69,6 +69,7 @@ int main()
 
     unsigned int diffuseMapTexture = loadTexture("./textures/container2.png");
     unsigned int specularMapTexture = loadTexture("./textures/container2_specular.png");
+    unsigned int emissionMapTexture = loadTexture("./textures/matrix.jpg");
 
     // Defined in Normalized Device Coordinates (between -1 and 1)
     // Eventually tranformed into screenspace via glViewport
@@ -218,6 +219,9 @@ int main()
         lightingShader.setInt("material.specular", 1);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, specularMapTexture);
+        lightingShader.setInt("material.emission", 2);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, emissionMapTexture);
         lightingShader.setFloat("material.shininess", 32.0f);
 
         // Set Light Properties
