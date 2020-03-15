@@ -155,6 +155,18 @@ int main()
     // Enable Z-buffer test
     glEnable(GL_DEPTH_TEST);
 
+    glm::vec3 cubePositions[] = {
+        glm::vec3(0.0f, 0.0f, 0.0f),
+        glm::vec3(2.0f, 5.0f, -15.0f),
+        glm::vec3(-1.5f, -2.2f, -2.5f),
+        glm::vec3(-3.8f, -2.0f, -12.3f),
+        glm::vec3(2.4f, -0.4f, -3.5f),
+        glm::vec3(-1.7f, 3.0f, -7.5f),
+        glm::vec3(1.3f, -2.0f, -2.5f),
+        glm::vec3(1.5f, 2.0f, -2.5f),
+        glm::vec3(1.5f, 0.2f, -1.5f),
+        glm::vec3(-1.3f, 1.0f, -1.5f)};
+
     // Render Loop
     while (!glfwWindowShouldClose(window))
     {
@@ -175,70 +187,68 @@ int main()
         // perspective(FOV, aspectRatio, nearPlaneDist, farPlaneDist)
         projection = glm::perspective<double>(glm::radians(45.0f), 800.0 / 600.0, 0.1f, 100.0f);
 
-        glm::vec3 lightPos = glm::vec3(0, 1.0f, -3.0f);
-        glm::mat4 lampModel = glm::mat4(1.0f);
-        lampModel = glm::translate(lampModel, lightPos);
-        lampModel = glm::scale(lampModel, glm::vec3(0.2f));
+        // glm::vec3 lightPos = glm::vec3(0, 1.0f, -3.0f);
+        // glm::mat4 lampModel = glm::mat4(1.0f);
+        // lampModel = glm::translate(lampModel, lightPos);
+        // lampModel = glm::scale(lampModel, glm::vec3(0.2f));
 
-        // Use lamp shader to render lamp
-        lampShader.use();
-        glm::vec3 lightColor;
-        lightColor.x = sin(glfwGetTime() * 2.0f);
-        lightColor.y = sin(glfwGetTime() * 0.7f);
-        lightColor.z = sin(glfwGetTime() * 1.3f);
+        // // Use lamp shader to render lamp
+        // lampShader.use();
+        // glm::vec3 lightColor;
+        // lightColor.x = sin(glfwGetTime() * 2.0f);
+        // lightColor.y = sin(glfwGetTime() * 0.7f);
+        // lightColor.z = sin(glfwGetTime() * 1.3f);
 
-        lampShader.setMat4("projection", projection);
-        lampShader.setMat4("view", view);
-        lampShader.setMat4("model", lampModel);
+        // lampShader.setMat4("projection", projection);
+        // lampShader.setMat4("view", view);
+        // lampShader.setMat4("model", lampModel);
 
-        lampShader.setVec3("color", lightColor);
-        glBindVertexArray(lightVAO);
-        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        // lampShader.setVec3("color", lightColor);
+        // glBindVertexArray(lightVAO);
+        // glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 
         // use our lighting shader program to render an object with light
         lightingShader.use();
-        lightingShader.setInt("texture1", 0);
-        lightingShader.setInt("texture2", 1);
         lightingShader.setVec3("viewPos", camera.Position);
-        // Selects Texture unit for subsequent bindTexture call
-        glBindVertexArray(VAO1);
-        glm::mat4 cubeModel = glm::mat4(1.0f);
-        cubeModel = glm::translate(cubeModel, glm::vec3(0, 0, -3.0f));
-        cubeModel = glm::rotate(cubeModel, (float)glfwGetTime() * glm::radians(50.0f), glm::vec3(0.5f, 1.0f, 0.0f));
-
         lightingShader.setMat4("projection", projection);
         lightingShader.setMat4("view", view);
-        lightingShader.setMat4("model", cubeModel);
-
-        // We can set a struct member using <struct>.member
-        // set Material Properties
-        // Diffuse maps are basically the main texture for a lit object
-        lightingShader.setInt("material.diffuse", 0);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, diffuseMapTexture);
-        lightingShader.setInt("material.specular", 1);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, specularMapTexture);
-        lightingShader.setInt("material.emission", 2);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, emissionMapTexture);
-        lightingShader.setFloat("material.shininess", 32.0f);
-
         // Set Light Properties
-        lightingShader.setVec3("light.position", lightPos);
+        lightingShader.setVec3("dirLight.direction", glm::vec3(-0.2f, -1.0f, -0.3f));
 
-        glm::vec3 diffuseColor = lightColor * glm::vec3(0.5f);
+        glm::vec3 diffuseColor = glm::vec3(0.8f);
         glm::vec3 ambientColor = diffuseColor * glm::vec3(0.2f);
 
-        lightingShader.setVec3("light.ambient", ambientColor);
-        lightingShader.setVec3("light.diffuse", diffuseColor);
-        lightingShader.setVec3("light.specular", glm::vec3(1.0f, 1.0f, 1.0f));
+        lightingShader.setVec3("dirLight.ambient", ambientColor);
+        lightingShader.setVec3("dirLight.diffuse", diffuseColor);
+        lightingShader.setVec3("dirLight.specular", glm::vec3(1.0f, 1.0f, 1.0f));
 
-        // glDrawElements uses an index array + allows access to Post-Transform cache, glDrawArrays does not
-        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(VAO1);
+        for (unsigned int i = 0; i < 10; i++)
+        {
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, cubePositions[i]);
+            float angle = 20.0f * i;
+            model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
+            lightingShader.setMat4("model", model);
 
+            // We can set a struct member using <struct>.member
+            // set Material Properties
+            // Diffuse maps are basically the main texture for a lit object
+            lightingShader.setInt("material.diffuse", 0);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, diffuseMapTexture);
+            lightingShader.setInt("material.specular", 1);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, specularMapTexture);
+            lightingShader.setInt("material.emission", 2);
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, emissionMapTexture);
+            lightingShader.setFloat("material.shininess", 32.0f);
+
+            // glDrawElements uses an index array + allows access to Post-Transform cache, glDrawArrays does not
+            glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        }
         glBindVertexArray(0); // Unbind vertex array
-
         // Checks for keyboard, mouse, etc.
         glfwPollEvents();
         // Swap pixel color buffers for window
