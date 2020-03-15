@@ -25,6 +25,7 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 int generateModelVAO(vector<float> vertices, vector<unsigned int> indices);
 int generateLightVAO(vector<float> vertices, vector<unsigned int> indices);
+unsigned int loadTexture(char const *path);
 
 Camera camera = Camera();
 
@@ -66,59 +67,13 @@ int main()
 
     Shader lightingShader = Shader("./shaders/vertex.glsl", "./shaders/fragLighting.glsl");
 
-    unsigned int texture;
-    // (numTextures, out ID)
-    glGenTextures(1, &texture);
-    // Sets active texture for subsequent commands
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    // set the texture wrapping/filtering options (on the currently bound texture object)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    int width, height, nrChannels;
-    unsigned char *data = stbi_load("./textures/container.jpg", &width, &height, &nrChannels, 0);
-    if (!data)
-    {
-        throw runtime_error("Failed to load texture");
-    }
-    // Load data for texture (textureTarget, mipmapLevel, storageFormat, w, h, 0, imageFormat, imageDataType, dataPtr)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-    glGenerateMipmap(GL_TEXTURE_2D); // Auto-Generate MipMaps (can be set manually instead)
-
-    stbi_image_free(data);
-
-    unsigned int texture2;
-    // (numTextures, out ID)
-    glGenTextures(1, &texture2);
-    // Sets active texture for subsequent commands
-
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, texture2);
-    // set the texture wrapping/filtering options (on the currently bound texture object)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    data = stbi_load("./textures/awesomeface.png", &width, &height, &nrChannels, 0);
-    if (!data)
-    {
-        throw runtime_error("Failed to load texture");
-    }
-    // Load data for texture (textureTarget, mipmapLevel, storageFormat, w, h, 0, imageFormat, imageDataType, dataPtr)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-    glGenerateMipmap(GL_TEXTURE_2D); // Auto-Generate MipMaps (can be set manually instead)
-
-    stbi_image_free(data);
+    unsigned int diffuseMapTexture = loadTexture("./textures/container2.png");
+    unsigned int specularMapTexture = loadTexture("./textures/container2_specular.png");
 
     // Defined in Normalized Device Coordinates (between -1 and 1)
     // Eventually tranformed into screenspace via glViewport
-
     vector<float> vertices = {
+        // positions          // normals           // texture coords
         -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f,
         0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f,
         0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f,
@@ -234,6 +189,7 @@ int main()
         lampShader.setMat4("projection", projection);
         lampShader.setMat4("view", view);
         lampShader.setMat4("model", lampModel);
+
         lampShader.setVec3("color", lightColor);
         glBindVertexArray(lightVAO);
         glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
@@ -255,9 +211,13 @@ int main()
 
         // We can set a struct member using <struct>.member
         // set Material Properties
-        lightingShader.setVec3("material.ambient", glm::vec3(0.5f, 0.5f, 0.5f));
-        lightingShader.setVec3("material.diffuse", glm::vec3(1.0f, 1.0f, 1.0f));
-        lightingShader.setVec3("material.specular", glm::vec3(1.0f, 1.0f, 1.0f));
+        // Diffuse maps are basically the main texture for a lit object
+        lightingShader.setInt("material.diffuse", 0);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, diffuseMapTexture);
+        lightingShader.setInt("material.specular", 1);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, specularMapTexture);
         lightingShader.setFloat("material.shininess", 32.0f);
 
         // Set Light Properties
@@ -349,6 +309,49 @@ int generateLightVAO(vector<float> vertices, vector<unsigned int> indices)
     return VAO;
 }
 
+// utility function for loading a 2D texture from file
+// ---------------------------------------------------
+unsigned int loadTexture(char const *path)
+{
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+
+    int width, height, nrComponents;
+    // Load Raw Bytes from Disk
+    unsigned char *data = stbi_load(path, &width, &height, &nrComponents, 0);
+    if (data)
+    {
+        GLenum format;
+        if (nrComponents == 1)
+            format = GL_RED; // No idea but I guess we have to be ready for it?
+        else if (nrComponents == 3)
+            format = GL_RGB; // Files like JPG
+        else if (nrComponents == 4)
+            format = GL_RGBA; // Files like PNG
+
+        // Bind next operations to textureID
+        glBindTexture(GL_TEXTURE_2D, textureID);
+        // Store Texture Data
+        // (texture type, LOD level, internal format, w, h, border=0, pixel data format, pixel data type, data pointer)
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        stbi_image_free(data);
+    }
+    else
+    {
+        std::cout << "Texture failed to load at path: " << path << std::endl;
+        stbi_image_free(data);
+    }
+
+    return textureID;
+}
+
 void processInput(GLFWwindow *window)
 {
     float cameraSpeed = 2.5f * deltaTime;
@@ -365,13 +368,25 @@ void processInput(GLFWwindow *window)
 }
 
 float lastX = 400, lastY = 300;
+bool firstMouse = true;
+// glfw: whenever the mouse moves, this callback is called
+// -------------------------------------------------------
 void mouse_callback(GLFWwindow *window, double xpos, double ypos)
 {
+    if (firstMouse)
+    {
+        lastX = xpos;
+        lastY = ypos;
+        firstMouse = false;
+    }
+
     float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos; // reversed since y-coordinates range from bottom to top
+    float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+
     lastX = xpos;
     lastY = ypos;
-    camera.ProcessMouseMovement(xoffset, yoffset, true);
+
+    camera.ProcessMouseMovement(xoffset, yoffset);
 }
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height)
