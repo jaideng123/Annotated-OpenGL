@@ -232,6 +232,18 @@ int main()
         lightingShader.setFloat("pointLight.linear", 0.09f);
         lightingShader.setFloat("pointLight.quadratic", 0.032f);
 
+        // Setup Spot Light
+        lightingShader.setVec3("spotLight.ambient", glm::vec3(0.8f) * glm::vec3(0.2f));
+        lightingShader.setVec3("spotLight.diffuse", glm::vec3(0.8f));
+        lightingShader.setVec3("spotLight.specular", glm::vec3(1.0f, 1.0f, 1.0f));
+        lightingShader.setFloat("spotLight.constant", 1.0f);
+        lightingShader.setFloat("spotLight.linear", 0.09f);
+        lightingShader.setFloat("spotLight.quadratic", 0.032f);
+        lightingShader.setVec3("spotLight.position", camera.Position);
+        lightingShader.setVec3("spotLight.direction", camera.Front);
+        lightingShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
+        lightingShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(17.5f)));
+
         glBindVertexArray(VAO1);
         for (unsigned int i = 0; i < 10; i++)
         {
