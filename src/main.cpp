@@ -187,25 +187,25 @@ int main()
         // perspective(FOV, aspectRatio, nearPlaneDist, farPlaneDist)
         projection = glm::perspective<double>(glm::radians(45.0f), 800.0 / 600.0, 0.1f, 100.0f);
 
-        // glm::vec3 lightPos = glm::vec3(0, 1.0f, -3.0f);
-        // glm::mat4 lampModel = glm::mat4(1.0f);
-        // lampModel = glm::translate(lampModel, lightPos);
-        // lampModel = glm::scale(lampModel, glm::vec3(0.2f));
+        glm::vec3 lightPos = glm::vec3(0, 1.0f, -3.0f);
+        glm::mat4 lampModel = glm::mat4(1.0f);
+        lampModel = glm::translate(lampModel, lightPos);
+        lampModel = glm::scale(lampModel, glm::vec3(0.2f));
 
-        // // Use lamp shader to render lamp
-        // lampShader.use();
-        // glm::vec3 lightColor;
-        // lightColor.x = sin(glfwGetTime() * 2.0f);
-        // lightColor.y = sin(glfwGetTime() * 0.7f);
-        // lightColor.z = sin(glfwGetTime() * 1.3f);
+        // Use lamp shader to render lamp
+        lampShader.use();
+        glm::vec3 lightColor;
+        lightColor.x = sin(glfwGetTime() * 2.0f);
+        lightColor.y = sin(glfwGetTime() * 0.7f);
+        lightColor.z = sin(glfwGetTime() * 1.3f);
 
-        // lampShader.setMat4("projection", projection);
-        // lampShader.setMat4("view", view);
-        // lampShader.setMat4("model", lampModel);
+        lampShader.setMat4("projection", projection);
+        lampShader.setMat4("view", view);
+        lampShader.setMat4("model", lampModel);
 
-        // lampShader.setVec3("color", lightColor);
-        // glBindVertexArray(lightVAO);
-        // glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        lampShader.setVec3("color", lightColor);
+        glBindVertexArray(lightVAO);
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 
         // use our lighting shader program to render an object with light
         lightingShader.use();
@@ -215,12 +215,22 @@ int main()
         // Set Light Properties
         lightingShader.setVec3("dirLight.direction", glm::vec3(-0.2f, -1.0f, -0.3f));
 
-        glm::vec3 diffuseColor = glm::vec3(0.8f);
+        glm::vec3 diffuseColor = glm::vec3(0.3f);
         glm::vec3 ambientColor = diffuseColor * glm::vec3(0.2f);
 
+        // Setup Directional Light
         lightingShader.setVec3("dirLight.ambient", ambientColor);
         lightingShader.setVec3("dirLight.diffuse", diffuseColor);
         lightingShader.setVec3("dirLight.specular", glm::vec3(1.0f, 1.0f, 1.0f));
+
+        // Setup Point Light
+        lightingShader.setVec3("pointLight.position", lightPos);
+        lightingShader.setVec3("pointLight.ambient", ambientColor);
+        lightingShader.setVec3("pointLight.diffuse", lightColor);
+        lightingShader.setVec3("pointLight.specular", glm::vec3(1.0f, 1.0f, 1.0f));
+        lightingShader.setFloat("pointLight.constant", 1.0f);
+        lightingShader.setFloat("pointLight.linear", 0.09f);
+        lightingShader.setFloat("pointLight.quadratic", 0.032f);
 
         glBindVertexArray(VAO1);
         for (unsigned int i = 0; i < 10; i++)
