@@ -4,8 +4,9 @@
             "name": "Win32",
             "includePath": [
                 "${workspaceFolder}/**",
-                "C:\\cygwin64\\lib\\gcc\\x86_64-w64-mingw32\\7.4.0\\include",
-                "C:\\cygwin64\\lib\\gcc\\x86_64-w64-mingw32\\7.4.0"
+                "C:\\mingw64\\include",
+                "C:\\mingw64\\",
+                "${workspaceFolder}/include/**"
             ],
             "defines": [
                 "_DEBUG",
@@ -13,7 +14,7 @@
                 "_UNICODE"
             ],
             "windowsSdkVersion": "10.0.18362.0",
-            "compilerPath": "C:/cygwin64/bin/x86_64-w64-mingw32-gcc.exe",
+            "compilerPath": "C:/mingw64/bin/gcc.exe",
             "cStandard": "c11",
             "cppStandard": "c++17",
             "intelliSenseMode": "gcc-x64"
