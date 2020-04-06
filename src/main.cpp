@@ -33,6 +33,9 @@ Camera camera = Camera();
 float deltaTime = 0.0f; // Time between current frame and last frame
 float lastFrame = 0.0f; // Time of last frame
 
+int currentScreenWidth = 800;
+int currentScreenHeight = 600;
+
 // OpenGL acts as a state machine
 int main()
 {
@@ -44,7 +47,7 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow *window = glfwCreateWindow(800, 600, "LearnOpenGL", NULL, NULL);
+    GLFWwindow *window = glfwCreateWindow(currentScreenWidth, currentScreenHeight, "LearnOpenGL", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -87,7 +90,10 @@ int main()
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     // Enable Z-buffer test
+    // Depth -> Z value is based on a 1/x curve
     glEnable(GL_DEPTH_TEST);
+    // Defines which depth test function to use (Default = GL_LESS)
+    glDepthFunc(GL_LESS);
 
     glm::vec3 pointLightPositions[] = {
         glm::vec3(0.7f, 0.2f, 2.0f),
@@ -114,7 +120,8 @@ int main()
 
         glm::mat4 projection;
         // perspective(FOV, aspectRatio, nearPlaneDist, farPlaneDist)
-        projection = glm::perspective<double>(glm::radians(45.0f), 800.0 / 600.0, 0.1f, 100.0f);
+        // Near Plane should be as far as possible to avoid z-fighting
+        projection = glm::perspective<double>(glm::radians(45.0f), currentScreenWidth / currentScreenHeight, 0.1f, 100.0f);
 
         // Use lamp shader to render lamp
         lampShader.use();
@@ -241,4 +248,6 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos)
 void framebuffer_size_callback(GLFWwindow *window, int width, int height)
 {
     glViewport(0, 0, width, height);
+    currentScreenHeight = height;
+    currentScreenWidth = width;
 }
