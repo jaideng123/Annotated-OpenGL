@@ -95,6 +95,13 @@ int main()
     // Defines which depth test function to use (Default = GL_LESS)
     glDepthFunc(GL_LESS);
 
+    // Enable Stencil Test
+    glEnable(GL_STENCIL_TEST);
+    // (stencilFail, stencilPassDepthFail, stencilAndDepthPass)
+    // GL_KEEP = keep original frag
+    // GL_REPLACE = replace original frag w/ new frag
+    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
     glm::vec3 pointLightPositions[] = {
         glm::vec3(0.7f, 0.2f, 2.0f),
         glm::vec3(2.3f, -3.3f, -4.0f),
@@ -113,7 +120,7 @@ int main()
         // Clears Color buffer
         // The possible bits for glClear() are:
         // GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT and GL_STENCIL_BUFFER_BIT
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         // Creates a view matrix w/ (pos,target,up) that is looking from pos to target
         glm::mat4 view = camera.GetViewMatrix();
@@ -133,6 +140,7 @@ int main()
 
         lampShader.setMat4("projection", projection);
         lampShader.setMat4("view", view);
+        glStencilMask(0x00); // disable writing to the stencil buffer
         for (int i = 0; i < 4; i++)
         {
             glm::vec3 lightPos = pointLightPositions[i];
@@ -142,7 +150,9 @@ int main()
             lampShader.setMat4("model", lampModel);
             nanoSuitModel.Draw(lampShader);
         }
-
+        // (function, comparison value, stencil mask)
+        glStencilFunc(GL_ALWAYS, 1, 0xFF); // all fragments should pass the stencil test
+        glStencilMask(0xFF);               // enable writing to the stencil buffer
         // use our lighting shader program to render an object with light
         lightingShader.use();
         lightingShader.setVec3("viewPos", camera.Position);
@@ -195,6 +205,20 @@ int main()
         lightingShader.setFloat("material.shininess", 32.0f);
 
         nanoSuitModel.Draw(lightingShader);
+
+        lampShader.use();
+        glStencilFunc(GL_NOTEQUAL, 1, 0xFF); // ignore all stencil values != 1
+        glStencilMask(0x00);                 // disable writing to the stencil buffer
+        glDisable(GL_DEPTH_TEST);            // ignore depth
+        glm::vec3 lightPos = glm::vec3(0.0f);
+        glm::mat4 lampModel = glm::mat4(1.0f);
+        lampModel = glm::translate(lampModel, lightPos);
+        lampModel = glm::scale(lampModel, glm::vec3(0.3f));
+        lampShader.setMat4("model", lampModel);
+        nanoSuitModel.Draw(lampShader);
+        glStencilMask(0xFF);
+        glStencilFunc(GL_ALWAYS, 1, 0xFF);
+        glEnable(GL_DEPTH_TEST);
 
         // Checks for keyboard, mouse, etc.
         glfwPollEvents();
