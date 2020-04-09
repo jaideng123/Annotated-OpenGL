@@ -27,6 +27,7 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 int generateModelVAO(vector<float> vertices, vector<unsigned int> indices);
 int generateLightVAO(vector<float> vertices, vector<unsigned int> indices);
 unsigned int loadTexture(char const *path);
+Mesh generate_plane(Texture texture);
 
 Camera camera = Camera();
 
@@ -71,9 +72,14 @@ int main()
     std::cout << "Loading Shaders..." << std::endl;
     Shader lampShader = Shader("./shaders/vertex.glsl", "./shaders/fragLamp.glsl");
     Shader lightingShader = Shader("./shaders/vertex.glsl", "./shaders/fragLighting.glsl");
+    Shader transparencyShader = Shader("./shaders/vertex.glsl", "./shaders/fragTrans.glsl");
 
     std::cout << "Loading Model..." << std::endl;
     Model nanoSuitModel = Model("./models/nanosuit/nanosuit.obj");
+    Texture texture;
+    texture.id = TextureFromFile("grass.png", "./textures", false, GL_CLAMP_TO_EDGE);
+    texture.type = "texture_diffuse";
+    Mesh planeMesh = generate_plane(texture);
 
     // Set size of the rendering window(viewport)
     // (X,Y,Len,Width) from top left corner
@@ -183,13 +189,13 @@ int main()
         }
 
         // Setup Spot Light
+        lightingShader.setVec3("spotLight.position", camera.Position);
         lightingShader.setVec3("spotLight.ambient", glm::vec3(0.8f) * glm::vec3(0.2f));
         lightingShader.setVec3("spotLight.diffuse", glm::vec3(0.8f));
         lightingShader.setVec3("spotLight.specular", glm::vec3(1.0f, 1.0f, 1.0f));
         lightingShader.setFloat("spotLight.constant", 1.0f);
         lightingShader.setFloat("spotLight.linear", 0.09f);
         lightingShader.setFloat("spotLight.quadratic", 0.032f);
-        lightingShader.setVec3("spotLight.position", camera.Position);
         lightingShader.setVec3("spotLight.direction", camera.Front);
         lightingShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
         lightingShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(17.5f)));
@@ -206,6 +212,16 @@ int main()
 
         nanoSuitModel.Draw(lightingShader);
 
+        transparencyShader.use();
+        transparencyShader.setVec3("viewPos", camera.Position);
+        transparencyShader.setMat4("projection", projection);
+        transparencyShader.setMat4("view", view);
+        model = glm::mat4(1.0f);
+        model = glm::scale(model, glm::vec3(1.0f));
+        model = glm::translate(model, glm::vec3(0, 0, -5.0f));
+        transparencyShader.setMat4("model", model);
+        planeMesh.Draw(transparencyShader);
+
         lampShader.use();
         glStencilFunc(GL_NOTEQUAL, 1, 0xFF); // ignore all stencil values != 1
         glStencilMask(0x00);                 // disable writing to the stencil buffer
@@ -216,6 +232,7 @@ int main()
         lampModel = glm::scale(lampModel, glm::vec3(0.3f));
         lampShader.setMat4("model", lampModel);
         nanoSuitModel.Draw(lampShader);
+        // Reset
         glStencilMask(0xFF);
         glStencilFunc(GL_ALWAYS, 1, 0xFF);
         glEnable(GL_DEPTH_TEST);
@@ -267,6 +284,23 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos)
     lastY = ypos;
 
     camera.ProcessMouseMovement(xoffset, yoffset);
+}
+
+Mesh generate_plane(Texture texture)
+{
+    vector<Vertex> vertices = {
+        (struct Vertex){.position = glm::vec3(0, 0.5f, 0), .texCoords = glm::vec2(1.0f, 1.0f)},
+        (struct Vertex){.position = glm::vec3(0, -0.5f, 0), .texCoords = glm::vec2(1.0f, 0)},
+        (struct Vertex){.position = glm::vec3(1.0f, -0.5f, 0), .texCoords = glm::vec2(0, 0)},
+
+        (struct Vertex){.position = glm::vec3(0.0f, 0.5f, 0), .texCoords = glm::vec2(1.0f, 1.0f)},
+        (struct Vertex){.position = glm::vec3(1.0f, -0.5f, 0), .texCoords = glm::vec2(0, 0)},
+        (struct Vertex){.position = glm::vec3(1.0f, 0.5f, 0), .texCoords = glm::vec2(0, 1.0f)},
+    };
+    vector<unsigned int> indices = {
+        0, 1, 2, 3, 4, 5};
+
+    return Mesh(vertices, indices, {texture});
 }
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height)

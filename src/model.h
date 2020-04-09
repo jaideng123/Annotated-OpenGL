@@ -14,6 +14,7 @@
 using namespace std;
 
 unsigned int TextureFromFile(const char *path, const string &directory, bool gamma = false);
+unsigned int TextureFromFile(const char *path, const string &directory, bool gamma, int wrapMode);
 glm::vec3 ConvertVector3(aiVector3D aiVec3);
 
 class Model
@@ -169,6 +170,11 @@ glm::vec3 ConvertVector3(aiVector3D aiVec3)
 
 unsigned int TextureFromFile(const char *path, const string &directory, bool gamma)
 {
+    return TextureFromFile(path, directory, gamma, GL_REPEAT);
+}
+
+unsigned int TextureFromFile(const char *path, const string &directory, bool gamma, int wrapMode)
+{
     string filename = string(path);
     filename = directory + '/' + filename;
 
@@ -191,8 +197,8 @@ unsigned int TextureFromFile(const char *path, const string &directory, bool gam
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapMode);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapMode);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
