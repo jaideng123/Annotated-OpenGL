@@ -110,12 +110,18 @@ int main()
     // GL_REPLACE = replace original frag w/ new frag
     glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 
+    // Enable Alpha Blending
     glEnable(GL_BLEND);
     // Sets Source and Dest Factors (color = c1(src) + c2(dest))
     // (source,dest)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     // Blends RGB and A separately
     // glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
+    // Enable Culling
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    // Defines which winding order to look for(winding order = order of verts in triangle)
+    glFrontFace(GL_CCW);
 
     glm::vec3 pointLightPositions[] = {
         glm::vec3(0.7f, 0.2f, 2.0f),
@@ -228,6 +234,8 @@ int main()
         nanoSuitModel.Draw(lightingShader);
 
         transparencyShader.use();
+        // We don't want culling for our quad windows
+        glDisable(GL_CULL_FACE);
         transparencyShader.setVec3("viewPos", camera.Position);
         transparencyShader.setMat4("projection", projection);
         transparencyShader.setMat4("view", view);
@@ -240,6 +248,7 @@ int main()
             transparencyShader.setMat4("model", model);
             planeMesh.Draw(transparencyShader);
         }
+        glEnable(GL_CULL_FACE);
 
         lampShader.use();
         glStencilFunc(GL_NOTEQUAL, 1, 0xFF); // ignore all stencil values != 1
