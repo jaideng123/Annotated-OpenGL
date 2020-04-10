@@ -14,6 +14,7 @@
 #include <fstream>
 #include <streambuf>
 #include <vector>
+#include <map>
 
 #include "shader.h"
 #include "model.h"
@@ -28,6 +29,7 @@ int generateModelVAO(vector<float> vertices, vector<unsigned int> indices);
 int generateLightVAO(vector<float> vertices, vector<unsigned int> indices);
 unsigned int loadTexture(char const *path);
 Mesh generate_plane(Texture texture);
+vector<glm::vec3> sortByCameraDistance(vector<glm::vec3> positions, glm::vec3 cameraPosition);
 
 Camera camera = Camera();
 
@@ -77,7 +79,7 @@ int main()
     std::cout << "Loading Model..." << std::endl;
     Model nanoSuitModel = Model("./models/nanosuit/nanosuit.obj");
     Texture texture;
-    texture.id = TextureFromFile("grass.png", "./textures", false, GL_CLAMP_TO_EDGE);
+    texture.id = TextureFromFile("transparent-window.png", "./textures", false, GL_CLAMP_TO_EDGE);
     texture.type = "texture_diffuse";
     Mesh planeMesh = generate_plane(texture);
 
@@ -108,11 +110,24 @@ int main()
     // GL_REPLACE = replace original frag w/ new frag
     glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 
+    glEnable(GL_BLEND);
+    // Sets Source and Dest Factors (color = c1(src) + c2(dest))
+    // (source,dest)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    // Blends RGB and A separately
+    // glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
+
     glm::vec3 pointLightPositions[] = {
         glm::vec3(0.7f, 0.2f, 2.0f),
         glm::vec3(2.3f, -3.3f, -4.0f),
         glm::vec3(-4.0f, 2.0f, -12.0f),
         glm::vec3(0.0f, 0.0f, -3.0f)};
+
+    vector<glm::vec3> windowPositions = {
+        glm::vec3(0.0f, 0.0f, 1.0f),
+        glm::vec3(0.0f, 0.0f, 3.0f),
+        glm::vec3(0.0f, 0.0f, 5.0f),
+        glm::vec3(0.0f, 0.0f, 7.0f)};
 
     std::cout << "Starting Render Loop" << std::endl;
     // Render Loop
@@ -216,11 +231,15 @@ int main()
         transparencyShader.setVec3("viewPos", camera.Position);
         transparencyShader.setMat4("projection", projection);
         transparencyShader.setMat4("view", view);
-        model = glm::mat4(1.0f);
-        model = glm::scale(model, glm::vec3(1.0f));
-        model = glm::translate(model, glm::vec3(0, 0, -5.0f));
-        transparencyShader.setMat4("model", model);
-        planeMesh.Draw(transparencyShader);
+        windowPositions = sortByCameraDistance(windowPositions, camera.Position);
+        for (size_t i = 0; i < windowPositions.size(); i++)
+        {
+            model = glm::mat4(1.0f);
+            model = glm::scale(model, glm::vec3(1.0f));
+            model = glm::translate(model, windowPositions[i]);
+            transparencyShader.setMat4("model", model);
+            planeMesh.Draw(transparencyShader);
+        }
 
         lampShader.use();
         glStencilFunc(GL_NOTEQUAL, 1, 0xFF); // ignore all stencil values != 1
@@ -247,6 +266,26 @@ int main()
     glfwTerminate();
 
     return 0;
+}
+
+// Warning: handling transparency like this can break under certain circumstances
+// https://www.khronos.org/opengl/wiki/Transparency_Sorting
+// Order Independant transparency can solve this (for newer hardware and/or w/ a perf cost)
+vector<glm::vec3> sortByCameraDistance(vector<glm::vec3> positions, glm::vec3 cameraPosition)
+{
+    std::map<float, glm::vec3> sorted;
+    for (unsigned int i = 0; i < positions.size(); i++)
+    {
+        float distance = glm::length(cameraPosition - positions[i]);
+        sorted[distance] = positions[i];
+    }
+    int i = 0;
+    for (std::map<float, glm::vec3>::reverse_iterator it = sorted.rbegin(); it != sorted.rend(); ++it)
+    {
+        positions[i] = it->second,
+        ++i;
+    }
+    return positions;
 }
 
 void processInput(GLFWwindow *window)
