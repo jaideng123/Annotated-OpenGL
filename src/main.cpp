@@ -19,18 +19,15 @@
 #include "shader.h"
 #include "model.h"
 #include "camera.h"
+#include "simple_models.h"
 
 using namespace std;
 
 void processInput(GLFWwindow *window);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
-int generateModelVAO(vector<float> vertices, vector<unsigned int> indices);
-int generateLightVAO(vector<float> vertices, vector<unsigned int> indices);
-int generateQuadVAO();
+unsigned int loadCubemap(vector<std::string> faces);
 void enableFrameBuffer(int frameBuffer);
-unsigned int loadTexture(char const *path);
-Mesh generate_plane(Texture texture);
 int generate_screen_texture();
 vector<glm::vec3> sortByCameraDistance(vector<glm::vec3> positions, glm::vec3 cameraPosition);
 
@@ -110,6 +107,9 @@ int main()
     Shader lightingShader = Shader("./shaders/vertex.glsl", "./shaders/fragLighting.glsl");
     Shader transparencyShader = Shader("./shaders/vertex.glsl", "./shaders/fragTrans.glsl");
     Shader screenShader = Shader("./shaders/vertScreen.glsl", "./shaders/fragScreen.glsl");
+    Shader skyboxShader = Shader("./shaders/vertSkybox.glsl", "./shaders/fragSkybox.glsl");
+    Shader reflectiveCubeShader = Shader("./shaders/vertReflect.glsl", "./shaders/fragReflect.glsl");
+    Shader refractiveCubeShader = Shader("./shaders/vertReflect.glsl", "./shaders/fragRefract.glsl");
 
     std::cout
         << "Loading Model..." << std::endl;
@@ -120,6 +120,20 @@ int main()
     Mesh planeMesh = generate_plane(texture);
 
     int quadVAO = generateQuadVAO();
+
+    vector<std::string> faces{
+        "./textures/skybox/right.jpg",
+        "./textures/skybox/left.jpg",
+        "./textures/skybox/top.jpg",
+        "./textures/skybox/bottom.jpg",
+        "./textures/skybox/front.jpg",
+        "./textures/skybox/back.jpg"};
+    unsigned int cubemapTexture = loadCubemap(faces);
+    unsigned int invertedCubemapTexture = loadCubemap(faces);
+
+    int skyboxVao = generate_skybox_vao();
+
+    int cubeVAO = generate_cube_vao();
 
     // Set size of the rendering window(viewport)
     // (X,Y,Len,Width) from top left corner
@@ -139,7 +153,7 @@ int main()
     // Depth -> Z value is based on a 1/x curve
     glEnable(GL_DEPTH_TEST);
     // Defines which depth test function to use (Default = GL_LESS)
-    glDepthFunc(GL_LESS);
+    glDepthFunc(GL_LEQUAL);
 
     // Enable Stencil Test
     glEnable(GL_STENCIL_TEST);
@@ -268,6 +282,40 @@ int main()
 
         nanoSuitModel.Draw(lightingShader);
 
+        // Draw a Reflective Cube
+        reflectiveCubeShader.use();
+        reflectiveCubeShader.setMat4("projection", projection);
+        reflectiveCubeShader.setMat4("view", view);
+        glm::mat4 cubeModel = glm::mat4(1.0f);
+        cubeModel = glm::translate(cubeModel, glm::vec3(5, 0, 0));
+        reflectiveCubeShader.setMat4("model", cubeModel);
+        reflectiveCubeShader.setVec3("cameraPos", camera.Position);
+        glDisable(GL_CULL_FACE); // TODO: fix this
+        glBindVertexArray(cubeVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glBindVertexArray(0);
+        glEnable(GL_CULL_FACE);
+        // Instead of using the skybox you can use a dynamically generated cubemap
+        // rendered in real-time (or baked) using framebuffers + six camera shots
+
+        // Draw a Refractive Cube
+        refractiveCubeShader.use();
+        refractiveCubeShader.setMat4("projection", projection);
+        refractiveCubeShader.setMat4("view", view);
+        glm::mat4 cubeModel2 = glm::mat4(1.0f);
+        cubeModel2 = glm::translate(cubeModel2, glm::vec3(-5, 0, 0));
+        refractiveCubeShader.setMat4("model", cubeModel2);
+        refractiveCubeShader.setVec3("cameraPos", camera.Position);
+        glDisable(GL_CULL_FACE); // TODO: fix this
+        glBindVertexArray(cubeVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glBindVertexArray(0);
+        glEnable(GL_CULL_FACE);
+
         transparencyShader.use();
         // We don't want culling for our quad windows
         glDisable(GL_CULL_FACE);
@@ -286,6 +334,7 @@ int main()
         glEnable(GL_CULL_FACE);
 
         lampShader.use();
+        // TODO: fix the rendering of this (skybox w/ new depth text broke it)
         glStencilFunc(GL_NOTEQUAL, 1, 0xFF); // ignore all stencil values != 1
         glStencilMask(0x00);                 // disable writing to the stencil buffer
         glDisable(GL_DEPTH_TEST);            // ignore depth
@@ -295,14 +344,23 @@ int main()
         lampModel = glm::scale(lampModel, glm::vec3(0.3f));
         lampShader.setMat4("model", lampModel);
         nanoSuitModel.Draw(lampShader);
-        // Reset
+        // Reset Stencil Buffer
         glStencilMask(0xFF);
         glStencilFunc(GL_ALWAYS, 1, 0xFF);
         glEnable(GL_DEPTH_TEST);
 
-        glBindFramebuffer(GL_FRAMEBUFFER, 0); // back to default
-        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        // Draw Skybox
+        glDepthMask(GL_FALSE);
+        skyboxShader.use();
+        skyboxShader.setMat4("projection", projection);
+        // Skybox is always drawn around camera position
+        skyboxShader.setMat4("view", glm::mat4(glm::mat3(camera.GetViewMatrix())));
+        glBindVertexArray(skyboxVao);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glDepthMask(GL_TRUE);
+
+        enableFrameBuffer(0);
 
         screenShader.use();
         glBindVertexArray(quadVAO);
@@ -361,33 +419,43 @@ void enableFrameBuffer(int frameBuffer)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // we're not using the stencil buffer now
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 }
 
-int generateQuadVAO()
+unsigned int loadCubemap(vector<std::string> faces)
 {
-    float quadVertices[] = {// vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
-                            // positions   // texCoords
-                            -1.0f, 1.0f, 0.0f, 1.0f,
-                            -1.0f, -1.0f, 0.0f, 0.0f,
-                            1.0f, -1.0f, 1.0f, 0.0f,
+    // Don't need to flip textures for the cube map
+    stbi_set_flip_vertically_on_load(false);
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
 
-                            -1.0f, 1.0f, 0.0f, 1.0f,
-                            1.0f, -1.0f, 1.0f, 0.0f,
-                            1.0f, 1.0f, 1.0f, 1.0f};
-    // screen quad VAO
-    unsigned int quadVAO, quadVBO;
-    glGenVertexArrays(1, &quadVAO);
-    glGenBuffers(1, &quadVBO);
-    glBindVertexArray(quadVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
-    return quadVAO;
+    int width, height, nrChannels;
+    for (unsigned int i = 0; i < faces.size(); i++)
+    {
+        unsigned char *data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
+        if (data)
+        {
+            // Adding i iterates through enum
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                         0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+            stbi_image_free(data);
+        }
+        else
+        {
+            std::cout << "Cubemap tex failed to load at path: " << faces[i] << std::endl;
+            stbi_image_free(data);
+        }
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    stbi_set_flip_vertically_on_load(true);
+
+    return textureID;
 }
 
 float lastX = 400, lastY = 300;
@@ -410,23 +478,6 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos)
     lastY = ypos;
 
     camera.ProcessMouseMovement(xoffset, yoffset);
-}
-
-Mesh generate_plane(Texture texture)
-{
-    vector<Vertex> vertices = {
-        (struct Vertex){.position = glm::vec3(0, 0.5f, 0), .texCoords = glm::vec2(1.0f, 1.0f)},
-        (struct Vertex){.position = glm::vec3(0, -0.5f, 0), .texCoords = glm::vec2(1.0f, 0)},
-        (struct Vertex){.position = glm::vec3(1.0f, -0.5f, 0), .texCoords = glm::vec2(0, 0)},
-
-        (struct Vertex){.position = glm::vec3(0.0f, 0.5f, 0), .texCoords = glm::vec2(1.0f, 1.0f)},
-        (struct Vertex){.position = glm::vec3(1.0f, -0.5f, 0), .texCoords = glm::vec2(0, 0)},
-        (struct Vertex){.position = glm::vec3(1.0f, 0.5f, 0), .texCoords = glm::vec2(0, 1.0f)},
-    };
-    vector<unsigned int> indices = {
-        0, 1, 2, 3, 4, 5};
-
-    return Mesh(vertices, indices, {texture});
 }
 
 int generate_screen_texture()
