@@ -27,8 +27,11 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 int generateModelVAO(vector<float> vertices, vector<unsigned int> indices);
 int generateLightVAO(vector<float> vertices, vector<unsigned int> indices);
+int generateQuadVAO();
+void enableFrameBuffer(int frameBuffer);
 unsigned int loadTexture(char const *path);
 Mesh generate_plane(Texture texture);
+int generate_screen_texture();
 vector<glm::vec3> sortByCameraDistance(vector<glm::vec3> positions, glm::vec3 cameraPosition);
 
 Camera camera = Camera();
@@ -71,21 +74,56 @@ int main()
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
+
+    // We can use a frame buffer to render to a texture and do cool post processing effects
+    // A FrameBuffer Requires
+    // 1. At least one attached buffer (color, depth or stencil buffer).
+    // 2. At least one color attachment.
+    // 3. All attachments should be complete (reserved memory).
+    // 4. Each buffer should have the same number of samples.
+    unsigned int frameBuffer;
+    glGenFramebuffers(1, &frameBuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+
+    int renderTexture = generate_screen_texture();
+    // Attach the texture to the currently bound Frame Buffer
+    // (Target, Attachment, TextureType, TextureId, MMLevel)
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, renderTexture, 0);
+
+    // Create a render buffer for depth + stencil
+    // RenderBuffers Offer a more efficient alternative to textures but don't allow sampling
+    unsigned int rbo;
+    glGenRenderbuffers(1, &rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, currentScreenWidth, currentScreenHeight);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+    // Re-Bind the default Frame Buffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
     std::cout << "Loading Shaders..." << std::endl;
     Shader lampShader = Shader("./shaders/vertex.glsl", "./shaders/fragLamp.glsl");
     Shader lightingShader = Shader("./shaders/vertex.glsl", "./shaders/fragLighting.glsl");
     Shader transparencyShader = Shader("./shaders/vertex.glsl", "./shaders/fragTrans.glsl");
+    Shader screenShader = Shader("./shaders/vertScreen.glsl", "./shaders/fragScreen.glsl");
 
-    std::cout << "Loading Model..." << std::endl;
+    std::cout
+        << "Loading Model..." << std::endl;
     Model nanoSuitModel = Model("./models/nanosuit/nanosuit.obj");
     Texture texture;
     texture.id = TextureFromFile("transparent-window.png", "./textures", false, GL_CLAMP_TO_EDGE);
     texture.type = "texture_diffuse";
     Mesh planeMesh = generate_plane(texture);
 
+    int quadVAO = generateQuadVAO();
+
     // Set size of the rendering window(viewport)
     // (X,Y,Len,Width) from top left corner
-    glViewport(0, 0, 800, 600);
+    glViewport(0, 0, currentScreenWidth, currentScreenHeight);
 
     // Callback to re-adjust viewport on window resize
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
@@ -144,10 +182,7 @@ int main()
         lastFrame = currentFrame;
         processInput(window);
 
-        // Clears Color buffer
-        // The possible bits for glClear() are:
-        // GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT and GL_STENCIL_BUFFER_BIT
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+        enableFrameBuffer(frameBuffer);
 
         // Creates a view matrix w/ (pos,target,up) that is looking from pos to target
         glm::mat4 view = camera.GetViewMatrix();
@@ -265,6 +300,16 @@ int main()
         glStencilFunc(GL_ALWAYS, 1, 0xFF);
         glEnable(GL_DEPTH_TEST);
 
+        glBindFramebuffer(GL_FRAMEBUFFER, 0); // back to default
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        screenShader.use();
+        glBindVertexArray(quadVAO);
+        glDisable(GL_DEPTH_TEST);
+        glBindTexture(GL_TEXTURE_2D, renderTexture);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
         // Checks for keyboard, mouse, etc.
         glfwPollEvents();
         // Swap pixel color buffers for window
@@ -312,6 +357,39 @@ void processInput(GLFWwindow *window)
         camera.ProcessKeyboard(RIGHT, deltaTime);
 }
 
+void enableFrameBuffer(int frameBuffer)
+{
+    glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // we're not using the stencil buffer now
+    glEnable(GL_DEPTH_TEST);
+}
+
+int generateQuadVAO()
+{
+    float quadVertices[] = {// vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
+                            // positions   // texCoords
+                            -1.0f, 1.0f, 0.0f, 1.0f,
+                            -1.0f, -1.0f, 0.0f, 0.0f,
+                            1.0f, -1.0f, 1.0f, 0.0f,
+
+                            -1.0f, 1.0f, 0.0f, 1.0f,
+                            1.0f, -1.0f, 1.0f, 0.0f,
+                            1.0f, 1.0f, 1.0f, 1.0f};
+    // screen quad VAO
+    unsigned int quadVAO, quadVBO;
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
+    return quadVAO;
+}
+
 float lastX = 400, lastY = 300;
 bool firstMouse = true;
 // glfw: whenever the mouse moves, this callback is called
@@ -349,6 +427,19 @@ Mesh generate_plane(Texture texture)
         0, 1, 2, 3, 4, 5};
 
     return Mesh(vertices, indices, {texture});
+}
+
+int generate_screen_texture()
+{
+    unsigned int texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, currentScreenWidth, currentScreenHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    return texture;
 }
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height)
