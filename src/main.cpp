@@ -49,6 +49,8 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    // Enable 4x MSAA
+    glfwWindowHint(GLFW_SAMPLES, 4);
 
     GLFWwindow *window = glfwCreateWindow(currentScreenWidth, currentScreenHeight, "LearnOpenGL", NULL, NULL);
     if (window == NULL)
@@ -186,6 +188,8 @@ int main()
         glm::vec3(0.0f, 0.0f, 3.0f),
         glm::vec3(0.0f, 0.0f, 5.0f),
         glm::vec3(0.0f, 0.0f, 7.0f)};
+
+    glEnable(GL_MULTISAMPLE);
 
     std::cout << "Starting Render Loop" << std::endl;
     // Render Loop

@@ -58,6 +58,8 @@ out vec4 FragColor;
 vec3 CalcDirLight(DirectionalLight light, vec3 normal, vec3 viewDir);
 vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
 vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
+// Blinn Phong feels more realistic than Phong and side steps a an issue with specular cut off
+bool useBlinnPhong = true;
 
 void main()
 {
@@ -79,6 +81,10 @@ vec3 CalcDirLight(DirectionalLight light, vec3 normal, vec3 viewDir)
     // specular shading
     vec3 reflectDir = reflect(-lightDir, normal);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+    if(useBlinnPhong){
+        vec3 halfwayDir = normalize(lightDir + viewDir);
+        spec = pow(max(dot(normal, halfwayDir), 0.0),material.shininess);
+    }
     // combine results
     vec3 ambient  = light.ambient  * vec3(texture(material.texture_diffuse1, TexCoords));
     vec3 diffuse  = light.diffuse  * diff * vec3(texture(material.texture_diffuse1, TexCoords));
@@ -94,6 +100,10 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
     // specular shading
     vec3 reflectDir = reflect(-lightDir, normal);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+    if(useBlinnPhong){
+        vec3 halfwayDir = normalize(lightDir + viewDir);
+        spec = pow(max(dot(normal, halfwayDir), 0.0),material.shininess);
+    }
     // attenuation
     float distance    = length(light.position - fragPos);
     // constant = makes sure denom never goes below X
@@ -126,6 +136,10 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir){
         vec3 viewDir = normalize(viewPos - fragPos);
         vec3 reflectDir = reflect(-lightDir, normal);  
         float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+        if(useBlinnPhong){
+            vec3 halfwayDir = normalize(lightDir + viewDir);
+            spec = pow(max(dot(normal, halfwayDir), 0.0), material.shininess);
+        }
         vec3 specular = light.specular * spec * texture(material.texture_specular1, TexCoords).rgb;  
 
         // Soft Edges 
